@@ -11,8 +11,6 @@
 **
 */
 
-#define _CRT_SECURE_NO_DEPRECATE
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +31,11 @@
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define SWAP(t,a,b) {t SWAP_temp = a;a = b;b = SWAP_temp;}
+
+#define W 800
+#define H 600
+#define MULTIS 1
+#define THREADS 8
 
 
 Uint32 gutime = 0;
@@ -57,43 +60,61 @@ int main( int argc, char* argv[] )
     SDL_Event event;
     Uint32 u;
     Uint32 v;
+    int i;
+    int w = W;
+    int h = H;
+    int multis = MULTIS;
+    int threads = THREADS;
+    unsigned seed = (unsigned)-1;
+
+    // Process cmd line args
+    for(i=1; i<argc; i++)
+    {
+        if( argv[i][0]=='-' ) switch( argv[i][1] )
+        {
+        case 'w': w = atoi(argv[i]+2); break;
+        case 'h': h = atoi(argv[i]+2); break;
+        case 'm': multis = atoi(argv[i]+2); break;
+        case 't': threads = atoi(argv[i]+2); break;
+        case '-': printf( "Usage: [OPTION]... [SEED]\nRender ray-traced 3D images generated randomly with seed number SEED.\n\n  option default description\n  -wNUM  %7d Set image output width to NUM\n  -hNUM  %7d Set image output height to NUM\n  -mNUM  %7d Set multisampling level to NUM (level 2 recommended)\n  -tNUM  %7d Parallelize with NUM threads\n",W,H,MULTIS,THREADS ), exit(0);
+        default: fprintf( stderr, "Halt! -%c isn't one of my options!\nUse --help for help.\n", argv[i][1] ), exit(-1);
+        }
+        else if( seed==(unsigned)-1 )
+        {
+            seed = atoi(argv[i]);
+            if( !seed )
+                fprintf( stderr, "Halt! SEED ought to be a positive number, not %s\n", argv[i] ), exit(-1);
+        }
+        else
+            fprintf( stderr, "Halt! I'm confused by cmd line argument #%d: %s\n", i, argv[i] ), exit(-1);
+    }
+
+    // Use time as seed if not otherwise specified
+    if( seed==(unsigned)-1 )
+        seed = (unsigned)time(NULL);
 
     // Init SDL
     if( SDL_Init( SDL_INIT_TIMER|SDL_INIT_AUDIO|SDL_INIT_VIDEO ) < 0 || !SDL_GetVideoInfo() )
         return 0;
 
     // Create Window
-    SetVideo( 400, 300 );
+    SetVideo( w, h );
     SDL_WM_SetCaption("PixelMachine", NULL);
 
     pinfo = SDL_GetVideoInfo();
 
     // font init
-    gpofont = SDL_CreateRGBSurface(SDL_SRCCOLORKEY,128,128,pinfo->vfmt->BitsPerPixel,pinfo->vfmt->Rmask,pinfo->vfmt->Gmask,pinfo->vfmt->Bmask,pinfo->vfmt->Amask);
-    SDL_SetColorKey( gpofont, SDL_SRCCOLORKEY, SDL_MapRGB(gpofont->format,0,0,0) );
-    SDL_FillRect( gpofont, NULL, SDL_MapRGB(gpofont->format,0,0,0) );
-    SDL_LockSurface( gpofont );
-    for(u=0; u<128; u++)
-        for(v=0; v<128; v++)
-            if( gsfontraw[u+v*128]!=' ' )
-                SDL_SetPixel( gpofont, u, v, 255, 255, 255 );
-            else if( (u<127 && gsfontraw[(u+1)+(v+0)*128]!=' ')
-                  || (u>0   && gsfontraw[(u-1)+(v+0)*128]!=' ')
-                  || (v<127 && gsfontraw[(u+0)+(v+1)*128]!=' ')
-                  || (v>0   && gsfontraw[(u+0)+(v-1)*128]!=' ') )
-                SDL_SetPixel( gpofont, u, v, 0, 0, 1 ); 
-    SDL_UnlockSurface( gpofont );
+    SJF_Init(pinfo);
 
     //pm setup
-    pixelmachine.w = 400;
-    pixelmachine.h = 300;
-    pixelmachine.multis = 1;
+    pixelmachine.init(seed,w,h,multis,threads);
 
     //ui setup
     ui.init();
     SJUI_HANDLE h_menu = ui.new_control(0,0,0,0);
-    SJUI_HANDLE h_render = ui.new_control(h_menu,150,20,SJUIF_EXTENDSV);
-    ui.set_caption(h_render,"Render");
+    ui.set_caption(h_menu,"UI menu test");
+    SJUI_HANDLE h_render = ui.new_control(h_menu,80,15,SJUIF_EXTENDSV);
+    ui.set_caption(h_render,"Click to render...");
 
     // MAIN LOOP
     while( 1 )

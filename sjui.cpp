@@ -1,6 +1,7 @@
 
 
 #include "sjui.h"
+#include "font.h"
 
 
 
@@ -48,8 +49,10 @@ void SJUI::paint( SDL_Surface *screen )
 
         if( visible )
         {
-            SDL_FillRect(screen,&rect,0xCCDDEE);
-            DrawSquare(screen,&rect,0xBBCCDD);
+            SDL_FillRect(screen,&rect,0x000000);
+            DrawSquare(screen,&rect,0x3333FF);
+            if( p->caption )
+              SJF_DrawText(screen,rect.x,rect.y,p->caption);
         }
     }
 }

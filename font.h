@@ -4,7 +4,7 @@
 
 #include <SDL/SDL.h>
 
-
+/*
 extern SDL_Surface *gpofont;
 
 extern int gnfontw;
@@ -12,11 +12,12 @@ extern int gnfonth;
 extern int gnfontpitch;
 extern int gnfontspace[];
 extern char gsfontraw[];
+*/
 
 
-
-inline void SJF_DrawChar(SDL_Surface *surf, int x, int y, char c);
-inline void SJF_DrawText(SDL_Surface *surf, int x, int y, const char *s);
+void SJF_Init(const SDL_VideoInfo *pinfo);
+void SJF_DrawChar(SDL_Surface *surf, int x, int y, char c);
+void SJF_DrawText(SDL_Surface *surf, int x, int y, const char *s);
 void SDL_SetPixel(SDL_Surface *surf, int x, int y, Uint8 R, Uint8 G, Uint8 B);
 
 

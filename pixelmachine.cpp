@@ -13,8 +13,6 @@ PIXELMACHINE::PIXELMACHINE()
     reg_alloc = 8;
     regions = (REG*)malloc(sizeof(REG)*reg_alloc);
     lock = SDL_CreateMutex();
-
-    init();
 }
 
 
@@ -27,7 +25,7 @@ PIXELMACHINE::~PIXELMACHINE()
 }
 
 
-void PIXELMACHINE::init()
+void PIXELMACHINE::init(unsigned _seed,int _w,int _h,int _multis,int _threads)
 {
     int i,j;
 
@@ -36,13 +34,12 @@ void PIXELMACHINE::init()
             memset( blocks[i][j], 0, BSIZE*sizeof(COLOR) );
     blocksize = 1000.0/((double)BSIZE);
 
-    w = W;
-    h = H;
-    multis = MULTIS;
-    threads = THREADS;
-    frames = FRAMES;
-
-    seed = (unsigned)time(NULL);
+    seed = _seed;
+    w = _w;
+    h = _h;
+    multis = _multis;
+    threads = _threads;
+    frames = 1;
 
     build_terrain();
     generate_objects();

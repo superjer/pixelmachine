@@ -147,7 +147,26 @@ char gsfontraw[] =
 "                                                                                                                                ";
 
 
-inline void SJF_DrawChar(SDL_Surface *surf, int x, int y, char c)
+void SJF_Init(const SDL_VideoInfo *pinfo)
+{
+    int u,v;
+    gpofont = SDL_CreateRGBSurface(SDL_SRCCOLORKEY,128,128,pinfo->vfmt->BitsPerPixel,pinfo->vfmt->Rmask,pinfo->vfmt->Gmask,pinfo->vfmt->Bmask,pinfo->vfmt->Amask);
+    SDL_SetColorKey( gpofont, SDL_SRCCOLORKEY, SDL_MapRGB(gpofont->format,0,0,0) );
+    SDL_FillRect( gpofont, NULL, SDL_MapRGB(gpofont->format,0,0,0) );
+    SDL_LockSurface( gpofont );
+    for(u=0; u<128; u++)
+        for(v=0; v<128; v++)
+            if( gsfontraw[u+v*128]!=' ' )
+                SDL_SetPixel( gpofont, u, v, 255, 255, 255 );
+            else if( (u<127 && gsfontraw[(u+1)+(v+0)*128]!=' ')
+                  || (u>0   && gsfontraw[(u-1)+(v+0)*128]!=' ')
+                  || (v<127 && gsfontraw[(u+0)+(v+1)*128]!=' ')
+                  || (v>0   && gsfontraw[(u+0)+(v-1)*128]!=' ') )
+                SDL_SetPixel( gpofont, u, v, 0, 0, 1 ); 
+    SDL_UnlockSurface( gpofont );
+}
+
+void SJF_DrawChar(SDL_Surface *surf, int x, int y, char c)
 {
     SDL_Rect src;
     SDL_Rect dst;
@@ -166,7 +185,7 @@ inline void SJF_DrawChar(SDL_Surface *surf, int x, int y, char c)
 }
 
 
-inline void SJF_DrawText(SDL_Surface *surf, int x, int y, const char *s)
+void SJF_DrawText(SDL_Surface *surf, int x, int y, const char *s)
 {
     SDL_Rect src;
     SDL_Rect dst;

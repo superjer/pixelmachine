@@ -27,7 +27,7 @@
 #include "collision.h"
 
 
-#define PHOTONMODE
+//#define PHOTONMODE
 
 
 #ifndef PHOTONMODE
@@ -44,15 +44,9 @@
 
 #define BSIZE (TERDIV*TERSECS+1)
 #define SQSIZE (1000.0/(double)BSIZE)
-#define MULTIS 2     // level of multisampling (makes rendering n^2 times slower!!)
-#define THREADS 8
 
 #define PREVIEWW 80
 #define PREVIEWH 60
-
-#define W 400     // output image size
-#define H 300
-#define FRAMES 1   // frames of animation
 
 #define MAXBOUNCE 20
 
@@ -147,7 +141,7 @@ struct PIXELMACHINE
     PIXELMACHINE();
     ~PIXELMACHINE();
 
-    void init();
+    void init(unsigned seed,int w,int h,int multis,int threads);
     void build_terrain();
     void generate_objects();
     void run();

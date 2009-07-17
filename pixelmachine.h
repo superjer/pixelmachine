@@ -26,6 +26,8 @@
 #include "font.h"
 #include "collision.h"
 
+#include "dSFMT.h"
+
 
 #define PHOTONMODE
 

@@ -1,6 +1,6 @@
 
-#include "pixelmachine.h"
 
+#include "pixelmachine.h"
 
 
 PIXELMACHINE::PIXELMACHINE()
@@ -766,23 +766,26 @@ int PIXELMACHINE::photon_thread( void *data )
 {
     PHOTON_ARGS *pa = (PHOTON_ARGS*)data;
     int i;
+    V o;
+    V v;
+    dsfmt_t dsfmt;
 
-    srand(pa->seed);
+    dsfmt_init_gen_rand(&dsfmt,pa->seed);
 
     for(i=0; i<pa->ration; i++)
     {
-        V o;
-        o.x = sun[0].x + (double)rand()*INVRAND*40.0-20.0;
-        o.y = sun[0].y + (double)rand()*INVRAND*20.0-10.0;
+        //SDL_mutexP(lock);
+        o.x = sun[0].x + dsfmt_genrand_close_open(&dsfmt)*10.0-20.0;
+        o.y = sun[0].y + dsfmt_genrand_close_open(&dsfmt)*5.0-10.0;
         o.z = sun[0].z;
-        V v;
         do
         {
-            v.x = (double)rand()*INVRAND-1.0;
-            v.y = (double)rand()*INVRAND-1.0;
-            v.z = (double)rand()*INVRAND*(-0.5);
+            v.x = dsfmt_genrand_close_open(&dsfmt)*2.0-1.0;
+            v.y = dsfmt_genrand_close_open(&dsfmt)*2.0-1.0;
+            v.z = dsfmt_genrand_close_open(&dsfmt)*-1.0;
         }
         while( v.x*v.x + v.y*v.y + v.z*v.z > 1.0 );
+        //SDL_mutexV(lock);
 
         raytrace(pa->c,o,v,MODE_PHOTON,0);
     }

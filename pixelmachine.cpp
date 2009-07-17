@@ -604,7 +604,14 @@ int PIXELMACHINE::render_thread( void *data )
 void PIXELMACHINE::render_photons( V cam, V tar, int w, int h, bool quiet )
 {
     int i,j,k,m,n;
-    COLOR c;
+    int ret;
+
+    SDL_Thread **kids;
+    kids = (SDL_Thread**)malloc(sizeof(SDL_Thread*)*threads);
+    memset(kids,0,sizeof(SDL_Thread*)*threads);
+
+    PHOTON_ARGS *pa;
+    pa = (PHOTON_ARGS*)malloc(sizeof(PHOTON_ARGS)*threads);
 
     if( img )
         free( img );
@@ -630,6 +637,7 @@ void PIXELMACHINE::render_photons( V cam, V tar, int w, int h, bool quiet )
     double di,dj;
     int subgoal;
     int substep;
+    int ration;
 
     subgoal = 0;
 
@@ -662,36 +670,106 @@ void PIXELMACHINE::render_photons( V cam, V tar, int w, int h, bool quiet )
                     ray.y = tar.y+wing.y+head.y - cam.y;
                     ray.z = tar.z+wing.z+head.z - cam.z;
 
+                    COLOR c;
                     raytrace( c, cam, ray, MODE_CAMRAY, 0, j*w+i );
                 }
 
         }
         
-        //if( !quiet )
-            if( (int)(1000*i/w) >= subgoal )
-            {
-                subgoal += 20;
-                if( subgoal%10==0 )
-                    sprintf(statustext,"Photon rendering - Mapping screen to world: %d%%",subgoal/10);
-                //else
-                //    printf(".");
-                //fflush(stdout);
-            }
+        if( (int)(1000*i/w) >= subgoal )
+        {
+            subgoal += 20;
+            if( subgoal%10==0 )
+                sprintf(statustext,"Photon rendering - Mapping screen to world: %d%%",subgoal/10);
+        }
     }
-    //if( !quiet )
-    //    printf("\n");
-
-    
     
 
     // blast photons around and feed the camera
-    c.r = 1.0;
-    c.g = 1.0;
-    c.b = 1.0;
-    c.a = 1.0;
-    substep = PHOTONS/100;
-    subgoal = substep;
-    for(i=0; i<PHOTONS; i++)
+    ration = (PHOTONS/100+threads-1)/threads;
+    for(i=0; i<100; i++)
+    {
+        int tn;
+        int todo;
+        todo = PHOTONS/100;
+        for(tn=0; tn<threads; tn++) // give each thread a chunk of 1% of all work
+        {
+            pa[tn].c.r = 1.0;
+            pa[tn].c.g = 1.0;
+            pa[tn].c.b = 1.0;
+            pa[tn].c.a = 1.0;
+            pa[tn].ration = (tn<threads-1)?(ration):(todo);
+            pa[tn].seed = seed + i*threads + tn;
+            pa[tn].lock = lock;
+            pa[tn].threadid = tn;
+            pa[tn].pm = this;
+            kids[tn] = SDL_CreateThread(ext_photon_thread,pa+tn);
+            todo -= ration;
+        }
+
+        for(tn=0; tn<threads; tn++) // wait for all threads
+            if( kids[tn] )
+                SDL_WaitThread(kids[tn],&ret);
+        
+        sprintf(statustext,"Photon rendering - Blasting photons: %d%%",i);
+        if( cancel )
+            break;
+
+        if( i==0 || i%10==9 )
+        {
+            int i;
+            // adjust dimg vals (HDR-like) and copy to bitmap
+            double max = 0.0;
+            for(i=0; i<w*h; i++)
+            {
+                if( dimg[i].r > max )
+                    max = dimg[i].r;
+                if( dimg[i].g > max )
+                    max = dimg[i].g;
+                if( dimg[i].b > max )
+                    max = dimg[i].b;
+            }
+            double scalar = 255.0/max;
+            for(i=0; i<w*h; i++)
+            {
+                img[i*3+2] = (unsigned char)(dimg[i].r*scalar);
+                img[i*3+1] = (unsigned char)(dimg[i].g*scalar);
+                img[i*3+0] = (unsigned char)(dimg[i].b*scalar);
+            }
+
+            // notify main that the image is ready
+            RENDER_ARGS ra;
+            ra.l = 0;
+            ra.r = w;
+            ra.t = 0;
+            ra.b = h;
+            push_region(&ra);
+        }
+    }
+
+    sprintf(statustext,"Photon rendering - Done");
+
+    free(kids);
+    free(pa);
+    free(dimg);
+}
+
+
+int ext_photon_thread( void *data )
+{
+    PIXELMACHINE::PHOTON_ARGS *pa = (PIXELMACHINE::PHOTON_ARGS*)data;
+    return pa->pm->photon_thread( data );
+}
+
+
+int PIXELMACHINE::photon_thread( void *data )
+{
+    PHOTON_ARGS *pa = (PHOTON_ARGS*)data;
+    int i;
+
+    srand(pa->seed);
+
+    for(i=0; i<pa->ration; i++)
     {
         V o;
         o.x = sun[0].x + (double)rand()*INVRAND*40.0-20.0;
@@ -706,56 +784,11 @@ void PIXELMACHINE::render_photons( V cam, V tar, int w, int h, bool quiet )
         }
         while( v.x*v.x + v.y*v.y + v.z*v.z > 1.0 );
 
-        raytrace(c,o,v,MODE_PHOTON,0);
-
-        //if( !quiet )
-            if( i >= subgoal )
-            {
-                subgoal += substep;
-                sprintf(statustext,"Photon rendering - Blasting photons: %d%%",(i/substep));
-                if( cancel )
-                    break;
-
-                if( i==substep || (i/substep)%10==0 )
-                {
-                    int i;
-                    // adjust dimg vals (HDR-like) and copy to bitmap
-                    double max = 0.0;
-                    for(i=0; i<w*h; i++)
-                    {
-                        if( dimg[i].r > max )
-                            max = dimg[i].r;
-                        if( dimg[i].g > max )
-                            max = dimg[i].g;
-                        if( dimg[i].b > max )
-                            max = dimg[i].b;
-                    }
-                    double scalar = 255.0/max;
-                    for(i=0; i<w*h; i++)
-                    {
-                        img[i*3+2] = (unsigned char)(dimg[i].r*scalar);
-                        img[i*3+1] = (unsigned char)(dimg[i].g*scalar);
-                        img[i*3+0] = (unsigned char)(dimg[i].b*scalar);
-                    }
-
-                    // notify main that the image is ready
-                    RENDER_ARGS ra;
-                    ra.l = 0;
-                    ra.r = w;
-                    ra.t = 0;
-                    ra.b = h;
-                    push_region(&ra);
-                }
-            }
+        raytrace(pa->c,o,v,MODE_PHOTON,0);
     }
 
-    sprintf(statustext,"Photon rendering - Done");
-
-    free(dimg);
+    return 0;
 }
-
-
-
 
 
 COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mode, int bounce, int pixelindex )

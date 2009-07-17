@@ -99,6 +99,15 @@ struct PIXELMACHINE
         int threadid;
         PIXELMACHINE *pm;
     };
+    struct PHOTON_ARGS
+    {
+        COLOR c;
+        int ration;
+        unsigned seed;
+        SDL_mutex *lock;
+        int threadid;
+        PIXELMACHINE *pm;
+    };
     struct P
     {
         V v;
@@ -151,6 +160,7 @@ struct PIXELMACHINE
     void push_region( RENDER_ARGS *ra );
     bool pop_region( SDL_Rect *rect );
     int render_thread( void *data );
+    int photon_thread( void *data );
     void render_photons( V cam, V tar, int w, int h, bool quiet );
     COLOR &raytrace( COLOR &color, const V &cam, const V &ray, int mode, int bounce, int pixelindex=NO_PIXEL );
     void attach( int pixelindex, const V &hit );
@@ -161,6 +171,7 @@ struct PIXELMACHINE
 
 
 int ext_render_thread( void *data );
+int ext_photon_thread( void *data );
 
 
 #endif //__PIXELMACHINE_H__

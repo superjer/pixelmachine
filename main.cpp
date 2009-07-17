@@ -89,6 +89,10 @@ int main( int argc, char* argv[] )
         else
             fprintf( stderr, "Halt! I'm confused by cmd line argument #%d: %s\n", i, argv[i] ), exit(-1);
     }
+    if( w<1 ) w=W;
+    if( h<1 ) h=H;
+    if( threads<1 ) threads=THREADS;
+    if( multis<1 ) multis=MULTIS;
 
     // Use time as seed if not otherwise specified
     if( seed==(unsigned)-1 )

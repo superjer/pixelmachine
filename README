@@ -1,0 +1,27 @@
+pixelmachine
+
+by SuperJer
+www.superjer.com
+
+
+Build on Linux:
+---------------
+1. Make sure you have SDL-devel on your system
+2. Run `make`
+   - this will create the executable `pixelmachine`
+
+
+Build on Windows:
+-----------------
+1. Install MinGW <http://www.mingw.org/>
+   - make sure it comes with MinGW Make
+2. Get SDL-devel for MinGW <http://www.libsdl.org/>
+   - copy the lib and include files into MinGW
+3. Run `mingw32-make win`
+   - this will create the executable `pixelmachine.exe`
+
+
+Build on Mac:
+-------------
+???
+

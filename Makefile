@@ -11,6 +11,7 @@ LIBSWIN = -lmingw32 -lSDLmain -lSDL -lm
 
 $(EXE_NAME): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(FLAGS) $(LIBS)
+	rm *.o
 
 win: $(OBJS)
 	$(CC) -o $(EXE_NAME).exe $(OBJS) $(FLAGS) -mwindows $(LIBSWIN)
@@ -18,5 +19,4 @@ win: $(OBJS)
 
 clean:
 	rm *.o
-	del *.o
 

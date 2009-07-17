@@ -29,7 +29,7 @@
 #include "dSFMT.h"
 
 
-#define PHOTONMODE
+//#define PHOTONMODE
 
 
 #ifndef PHOTONMODE

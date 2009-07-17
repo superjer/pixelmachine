@@ -47,6 +47,7 @@ SDL_Thread *thread;
 const SDL_VideoInfo *pinfo;
 PIXELMACHINE pixelmachine;
 SJUI ui;
+SJUI_HANDLE h_menu,h_render;
 
 int run_pixel_machine( void *data );
 void Render();
@@ -106,44 +107,40 @@ int main( int argc, char* argv[] )
     // font init
     SJF_Init(pinfo);
 
-    //pm setup
-    pixelmachine.init(seed,w,h,multis,threads);
-
     //ui setup
     ui.init();
-    SJUI_HANDLE h_menu = ui.new_control(0,0,0,0);
-    ui.set_caption(h_menu,"UI menu test");
-    SJUI_HANDLE h_render = ui.new_control(h_menu,80,15,SJUIF_EXTENDSV);
-    ui.set_caption(h_render,"Click to render...");
+    h_menu = ui.new_control(0,0,0,0);
+    h_render = ui.new_control(h_menu,80,15,SJUIF_EXTENDSV);
+    ui.set_caption(h_menu,"Click to render...");
+    ui.set_caption(h_render,"Loading");
+
+    //pm setup
+    pixelmachine.init(seed,w,h,multis,threads);
 
     // MAIN LOOP
     while( 1 )
     {
-        while( SDL_PollEvent( &event ) )
-            switch( event.type )
-            {
-            case SDL_VIDEOEXPOSE:
-                //Render();
-                break;
-            case SDL_VIDEORESIZE:
-                SetVideo( event.resize.w, event.resize.h );
-                //Render();
-                break;
-            case SDL_MOUSEBUTTONDOWN:
-                if( !pixelmachine.running )
-                {
-                    thread = SDL_CreateThread(run_pixel_machine,NULL);
-                }
-                break;
-            case SDL_KEYDOWN:
-                ;
-                break;
-            case SDL_QUIT:
-                pixelmachine.cancel = true;
-                SDL_WaitThread(thread,NULL);
-                Cleanup();
-                break;
-            }
+        while( SDL_PollEvent(&event) ) switch(event.type)
+        {
+        case SDL_VIDEOEXPOSE:
+            ;
+            break;
+        case SDL_VIDEORESIZE:
+            SetVideo( event.resize.w, event.resize.h );
+            break;
+        case SDL_MOUSEBUTTONDOWN:
+            if( !pixelmachine.running )
+                thread = SDL_CreateThread(run_pixel_machine,NULL);
+            break;
+        case SDL_KEYDOWN:
+            ;
+            break;
+        case SDL_QUIT:
+            pixelmachine.cancel = true;
+            SDL_WaitThread(thread,NULL);
+            Cleanup();
+            break;
+        }
 
         gutimenow = SDL_GetTicks();
         if( (Uint32)(gutimenow-gutime)>50 )
@@ -187,7 +184,6 @@ void Render()
         if( !SDL_LockSurface(sdlrender) )
         {
             while( pixelmachine.pop_region(&rect) )
-            {
                 for(i=rect.x; i<rect.x+rect.w; i++)
                     for(j=rect.y; j<rect.y+rect.h; j++)
                     {
@@ -200,21 +196,13 @@ void Render()
                             for(n=(int)(j*ratioy);n<(int)((j+1)*ratioy);n++)
                                 SDL_SetPixel(sdlrender,m,n,r,g,b);
                     }
-            }
             SDL_UnlockSurface(sdlrender);
         }
-
         SDL_BlitSurface(sdlrender,NULL,sdlscreen,NULL);
     }
-    //orect.x = 0;
-    //orect.y = 0;
-    //orect.w = nwinw;
-    //orect.h = 16;
-    //ucolor = 0xCCCCCC;
-    //SDL_FillRect(sdlscreen,&orect,ucolor);
 
+    ui.set_caption(h_render,pixelmachine.statustext);
     ui.paint(sdlscreen);
-
     SDL_Flip(sdlscreen);
 }
 

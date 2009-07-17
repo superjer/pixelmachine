@@ -52,7 +52,7 @@ void SJUI::paint( SDL_Surface *screen )
             SDL_FillRect(screen,&rect,0x000000);
             DrawSquare(screen,&rect,0x3333FF);
             if( p->caption )
-              SJF_DrawText(screen,rect.x,rect.y,p->caption);
+              SJF_DrawText(screen,rect.x+2,rect.y+2,p->caption);
         }
     }
 }

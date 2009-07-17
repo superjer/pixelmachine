@@ -14,6 +14,7 @@ $(EXE_NAME): $(OBJS)
 
 win: $(OBJS)
 	$(CC) -o $(EXE_NAME).exe $(OBJS) $(FLAGS) -mwindows $(LIBSWIN)
+	rm *.o
 
 clean:
 	rm *.o

@@ -41,8 +41,12 @@ void PIXELMACHINE::init(unsigned _seed,int _w,int _h,int _multis,int _threads)
     threads = _threads;
     frames = 1;
 
+    srand(seed);
+
     build_terrain();
     generate_objects();
+
+    strcpy(statustext,"Ready");
 }
 
 
@@ -247,8 +251,6 @@ void PIXELMACHINE::run()
         patchterm[i][j][k] = &(patch[i][j][k]);
     }
 
-    srand(seed);
-    
     busy = (bool*)malloc(sizeof(bool)*threads);
 
 
@@ -269,9 +271,13 @@ void PIXELMACHINE::run()
         
         //printf("Rendering...\n");
 #ifndef PHOTONMODE
+        strcpy(statustext,"Rendering");
         render(w,h,false);
+        strcpy(statustext,"Ready");
 #else
+        strcpy(statustext,"Photon rendering");
         render_photons(cam,tar,w,h,false);
+        strcpy(statustext,"Ready");
 #endif
 
         printf("Writing frame %.4d ...\n",i);
@@ -293,7 +299,7 @@ void PIXELMACHINE::run()
             mkdir("./images");
 #endif
             unsigned t = (unsigned)time(NULL);
-            sprintf(str,"./images/img%d.bmp",t);
+            sprintf(str,"./images/seed%d_%d.bmp",seed,t);
             savebmp(str,w,h);
             //sprintf(str,"start ./images/img%d.bmp",t);
             //system(str);
@@ -402,7 +408,7 @@ void PIXELMACHINE::render( int w, int h, bool quiet )
 
     for(j=0;j<w;j++)
     {
-        while( busy[i] )
+        while( busy[i] ) // wait for a non-busy thread
         {
             i++;
             if( i%threads == 0 )
@@ -578,7 +584,7 @@ int PIXELMACHINE::render_thread( void *data )
 
             if( cancel )
             {
-                   busy[ra->threadid] = false;
+                busy[ra->threadid] = false;
                 return 1;
             }
 
@@ -627,6 +633,7 @@ void PIXELMACHINE::render_photons( V cam, V tar, int w, int h, bool quiet )
 
     subgoal = 0;
 
+    // Map screen to world (or is it the other way?)
     for(i=0; i<w; i++)
     {
         for(j=0; j<h; j++)
@@ -660,19 +667,19 @@ void PIXELMACHINE::render_photons( V cam, V tar, int w, int h, bool quiet )
 
         }
         
-        if( !quiet )
+        //if( !quiet )
             if( (int)(1000*i/w) >= subgoal )
             {
                 subgoal += 20;
-                if( subgoal%100==0 )
-                    printf("%d",subgoal/10);
-                else
-                    printf(".");
-                fflush(stdout);
+                if( subgoal%10==0 )
+                    sprintf(statustext,"Photon rendering - Mapping screen to world: %d%%",subgoal/10);
+                //else
+                //    printf(".");
+                //fflush(stdout);
             }
     }
-    if( !quiet )
-        printf("\n");
+    //if( !quiet )
+    //    printf("\n");
 
     
     
@@ -682,7 +689,7 @@ void PIXELMACHINE::render_photons( V cam, V tar, int w, int h, bool quiet )
     c.g = 1.0;
     c.b = 1.0;
     c.a = 1.0;
-    substep = PHOTONS/50;
+    substep = PHOTONS/100;
     subgoal = substep;
     for(i=0; i<PHOTONS; i++)
     {
@@ -701,40 +708,48 @@ void PIXELMACHINE::render_photons( V cam, V tar, int w, int h, bool quiet )
 
         raytrace(c,o,v,MODE_PHOTON,0);
 
-        if( !quiet )
+        //if( !quiet )
             if( i >= subgoal )
             {
                 subgoal += substep;
-                if( (i/substep)%5==0 )
-                    printf("%d",(i/substep)*2);
-                else
-                    printf(".");
-                fflush(stdout);
+                sprintf(statustext,"Photon rendering - Blasting photons: %d%%",(i/substep));
+                if( cancel )
+                    break;
+
+                if( i==substep || (i/substep)%10==0 )
+                {
+                    int i;
+                    // adjust dimg vals (HDR-like) and copy to bitmap
+                    double max = 0.0;
+                    for(i=0; i<w*h; i++)
+                    {
+                        if( dimg[i].r > max )
+                            max = dimg[i].r;
+                        if( dimg[i].g > max )
+                            max = dimg[i].g;
+                        if( dimg[i].b > max )
+                            max = dimg[i].b;
+                    }
+                    double scalar = 255.0/max;
+                    for(i=0; i<w*h; i++)
+                    {
+                        img[i*3+2] = (unsigned char)(dimg[i].r*scalar);
+                        img[i*3+1] = (unsigned char)(dimg[i].g*scalar);
+                        img[i*3+0] = (unsigned char)(dimg[i].b*scalar);
+                    }
+
+                    // notify main that the image is ready
+                    RENDER_ARGS ra;
+                    ra.l = 0;
+                    ra.r = w;
+                    ra.t = 0;
+                    ra.b = h;
+                    push_region(&ra);
+                }
             }
     }
-    if( !quiet )
-        printf("\n");
 
-
-    // adjust dimg vals (HDR-like) and copy to bitmap
-    double max = 0.0;
-    for(i=0; i<w*h; i++)
-    {
-        if( dimg[i].r > max )
-            max = dimg[i].r;
-        if( dimg[i].g > max )
-            max = dimg[i].g;
-        if( dimg[i].b > max )
-            max = dimg[i].b;
-    }
-    double scalar = 255.0/max;
-    for(i=0; i<w*h; i++)
-    {
-        img[i*3+2] = (unsigned char)(dimg[i].r*scalar);
-        img[i*3+1] = (unsigned char)(dimg[i].g*scalar);
-        img[i*3+0] = (unsigned char)(dimg[i].b*scalar);
-    }
-    //_getch();
+    sprintf(statustext,"Photon rendering - Done");
 
     free(dimg);
 }

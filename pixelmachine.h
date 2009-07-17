@@ -27,7 +27,7 @@
 #include "collision.h"
 
 
-//#define PHOTONMODE
+#define PHOTONMODE
 
 
 #ifndef PHOTONMODE
@@ -81,7 +81,7 @@
 #define MODE_LIGHTTEST 1
 #define MODE_PHOTON 2
 
-#define PHOTONS 150000000
+#define PHOTONS 20000000
 
 #define INVRAND ((double)2.0/(double)RAND_MAX)
 
@@ -137,6 +137,7 @@ struct PIXELMACHINE
     int reg_alloc;
     SDL_mutex *lock;
     bool cancel;
+    char statustext[80];
 
     PIXELMACHINE();
     ~PIXELMACHINE();

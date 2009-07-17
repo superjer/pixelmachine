@@ -4,6 +4,17 @@ by SuperJer
 www.superjer.com
 
 
+Usage: [OPTION]... [SEED]
+Render ray-traced 3D images generated randomly with seed number SEED.
+
+  option default description
+  -wNUM      800 Set image output width to NUM
+  -hNUM      600 Set image output height to NUM
+  -mNUM        2 Set multisampling level to NUM (level 2 recommended)
+  -tNUM        8 Parallelize with NUM threads
+  -pNUM        0 Simulate lighting with NUM million photons!
+
+
 Build on Linux:
 ---------------
 1. Make sure you have SDL-devel on your system

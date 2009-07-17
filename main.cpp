@@ -34,8 +34,9 @@
 
 #define W 800
 #define H 600
-#define MULTIS 1
+#define MULTIS 2
 #define THREADS 8
+#define PHOTONS 0
 
 
 Uint32 gutime = 0;
@@ -66,6 +67,7 @@ int main( int argc, char* argv[] )
     int h = H;
     int multis = MULTIS;
     int threads = THREADS;
+    int photons = PHOTONS;
     unsigned seed = (unsigned)-1;
 
     // Process cmd line args
@@ -77,7 +79,8 @@ int main( int argc, char* argv[] )
         case 'h': h = atoi(argv[i]+2); break;
         case 'm': multis = atoi(argv[i]+2); break;
         case 't': threads = atoi(argv[i]+2); break;
-        case '-': printf( "Usage: [OPTION]... [SEED]\nRender ray-traced 3D images generated randomly with seed number SEED.\n\n  option default description\n  -wNUM  %7d Set image output width to NUM\n  -hNUM  %7d Set image output height to NUM\n  -mNUM  %7d Set multisampling level to NUM (level 2 recommended)\n  -tNUM  %7d Parallelize with NUM threads\n",W,H,MULTIS,THREADS ), exit(0);
+        case 'p': photons = atoi(argv[i]+2); break;
+        case '-': printf( "Usage: [OPTION]... [SEED]\nRender ray-traced 3D images generated randomly with seed number SEED.\n\n  option default description\n  -wNUM  %7d Set image output width to NUM\n  -hNUM  %7d Set image output height to NUM\n  -mNUM  %7d Set multisampling level to NUM (level 2 recommended)\n  -tNUM  %7d Parallelize with NUM threads\n  -pNUM  %7d Simulate lighting with NUM million photons!\n",W,H,MULTIS,THREADS,PHOTONS ), exit(0);
         default: fprintf( stderr, "Halt! -%c isn't one of my options!\nUse --help for help.\n", argv[i][1] ), exit(-1);
         }
         else if( seed==(unsigned)-1 )
@@ -91,8 +94,9 @@ int main( int argc, char* argv[] )
     }
     if( w<1 ) w=W;
     if( h<1 ) h=H;
-    if( threads<1 ) threads=THREADS;
     if( multis<1 ) multis=MULTIS;
+    if( threads<1 ) threads=THREADS;
+    if( photons<1 ) photons=PHOTONS;
 
     // Use time as seed if not otherwise specified
     if( seed==(unsigned)-1 )
@@ -119,7 +123,7 @@ int main( int argc, char* argv[] )
     ui.set_caption(h_render,"Loading");
 
     //pm setup
-    pixelmachine.init(seed,w,h,multis,threads);
+    pixelmachine.init(seed,w,h,multis,threads,photons);
 
     // MAIN LOOP
     while( 1 )

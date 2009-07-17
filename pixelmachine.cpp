@@ -7,6 +7,10 @@ PIXELMACHINE::PIXELMACHINE()
 {
     cancel = false;
     running = false;
+    //spheremania = false;
+    blocks = NULL;
+    terrain = NULL;
+    sphere = NULL;
     img = NULL;
     dimg = NULL;
     reg_count = 0;
@@ -19,28 +23,68 @@ PIXELMACHINE::PIXELMACHINE()
 PIXELMACHINE::~PIXELMACHINE()
 {
     SDL_DestroyMutex(lock);
+
+    free(regions);
+
+    int i,j;
+    for(i=0; i<c_bsize; i++)
+    {
+        for(j=0; j<c_bsize; j++)
+            free(blocks[i][j]);
+        free(terrain[i]);
+        free(blocks[i]);
+    }
+    free(terrain);
+    free(blocks);
+    free(sphere);
+
     if(img)
         free(img);
-    free(regions);
 }
 
 
-void PIXELMACHINE::init(unsigned _seed,int _w,int _h,int _multis,int _threads)
+void PIXELMACHINE::init(unsigned _seed,int _w,int _h,int _multis,int _threads,int _photons)
 {
-    int i,j;
-
-    for(i=0; i<BSIZE; i++)
-        for(j=0; j<BSIZE; j++)
-            memset( blocks[i][j], 0, BSIZE*sizeof(COLOR) );
-    blocksize = 1000.0/((double)BSIZE);
-
     seed = _seed;
     w = _w;
     h = _h;
     multis = _multis;
     threads = _threads;
+    photons = _photons;
     frames = 1;
 
+    if( !photons )
+    {
+      c_terdiv  = TERDIV;
+      c_tersecs = TERSECS;
+      c_falloff = FALLOFF;
+      c_bsize   = BSIZE;
+      c_sqsize  = SQSIZE;
+      c_spheres = SPHERES;
+    }
+    else
+    {
+      c_terdiv  = PH_TERDIV;
+      c_tersecs = PH_TERSECS;
+      c_falloff = PH_FALLOFF;
+      c_bsize   = PH_BSIZE;
+      c_sqsize  = PH_SQSIZE;
+      c_spheres = PH_SPHERES;
+    }
+
+    int i,j;
+    blocks = (COLOR ***)malloc(c_bsize*sizeof *blocks);
+    terrain = (double **)malloc(c_bsize*sizeof *terrain);
+    for(i=0; i<c_bsize; i++)
+    {
+        blocks[i] = (COLOR **)malloc(c_bsize*sizeof **blocks);
+        terrain[i] = (double *)malloc(c_bsize*sizeof **terrain);
+        for(j=0; j<c_bsize; j++)
+            blocks[i][j] = (COLOR *)calloc(c_bsize,sizeof ***blocks);
+    }
+    sphere = (SPHERE *)calloc(c_spheres+1,sizeof(SPHERE));
+
+    blocksize = 1000.0/((double)c_bsize);
     srand(seed);
 
     build_terrain();
@@ -50,66 +94,62 @@ void PIXELMACHINE::init(unsigned _seed,int _w,int _h,int _multis,int _threads)
 }
 
 
-
-
 void PIXELMACHINE::build_terrain()
 {
     int i,j,k;
 
-#ifndef PHOTONMODE
-    int div = TERDIV;
-    for(i=0;i<BSIZE;i+=div)
-        for(j=0;j<BSIZE;j+=div)
-        {
-            terrain[i][j] = (double)(rand()%1000)*0.33-200.0;
-        }
-    while( div>1 )
+    if( !photons )
     {
-        for(i=div/2;i<BSIZE;i+=div)
-            for(j=div/2;j<BSIZE;j+=div)
+        int div = c_terdiv;
+        for(i=0;i<c_bsize;i+=div)
+            for(j=0;j<c_bsize;j+=div)
             {
-                terrain[i][j] = (terrain[i-div/2][j-div/2] + terrain[i-div/2][j+div/2] + terrain[i+div/2][j-div/2] + terrain[i+div/2][j+div/2])*0.25;
+                terrain[i][j] = (double)(rand()%1000)*0.33-200.0;
             }
-
-        for(i=0;i<BSIZE;i+=div/2)
-            for(j=0;j<BSIZE;j+=div/2)
-            {
-                if( (i+j)%div )
+        while( div>1 )
+        {
+            for(i=div/2;i<c_bsize;i+=div)
+                for(j=div/2;j<c_bsize;j+=div)
                 {
-                    if( i==0 )
-                        terrain[i][j] = (                      terrain[i+div/2][j] + terrain[i][j-div/2] + terrain[i][j+div/2])*0.33333;
-                    else if( i==BSIZE-1 )
-                        terrain[i][j] = (terrain[i-div/2][j]                       + terrain[i][j-div/2] + terrain[i][j+div/2])*0.33333;
-                    else if( j==0 )
-                        terrain[i][j] = (terrain[i-div/2][j] + terrain[i+div/2][j]                       + terrain[i][j+div/2])*0.33333;
-                    else if( j==BSIZE-1 )
-                        terrain[i][j] = (terrain[i-div/2][j] + terrain[i+div/2][j] + terrain[i][j-div/2]                      )*0.33333;
-                    else
-                        terrain[i][j] = (terrain[i-div/2][j] + terrain[i+div/2][j] + terrain[i][j-div/2] + terrain[i][j+div/2])*0.25;
+                    terrain[i][j] = (terrain[i-div/2][j-div/2] + terrain[i-div/2][j+div/2] + terrain[i+div/2][j-div/2] + terrain[i+div/2][j+div/2])*0.25;
                 }
-            }
 
-        div /= 2;
-    }
-#endif
-
-    for(k=0; k<BSIZE; k++)
-        for(i=0; i<BSIZE; i++)
-            for(j=0; j<BSIZE; j++)
-            {
-#ifndef PHOTONMODE
-                if( k==0 )
+            for(i=0;i<c_bsize;i+=div/2)
+                for(j=0;j<c_bsize;j+=div/2)
                 {
-#endif
+                    if( (i+j)%div )
+                    {
+                        if( i==0 )
+                            terrain[i][j] = (                      terrain[i+div/2][j] + terrain[i][j-div/2] + terrain[i][j+div/2])*0.33333;
+                        else if( i==c_bsize-1 )
+                            terrain[i][j] = (terrain[i-div/2][j]                       + terrain[i][j-div/2] + terrain[i][j+div/2])*0.33333;
+                        else if( j==0 )
+                            terrain[i][j] = (terrain[i-div/2][j] + terrain[i+div/2][j]                       + terrain[i][j+div/2])*0.33333;
+                        else if( j==c_bsize-1 )
+                            terrain[i][j] = (terrain[i-div/2][j] + terrain[i+div/2][j] + terrain[i][j-div/2]                      )*0.33333;
+                        else
+                            terrain[i][j] = (terrain[i-div/2][j] + terrain[i+div/2][j] + terrain[i][j-div/2] + terrain[i][j+div/2])*0.25;
+                    }
+                }
+
+            div /= 2;
+        }
+    }
+
+    for(k=0; k<c_bsize; k++)
+        for(i=0; i<c_bsize; i++)
+            for(j=0; j<c_bsize; j++)
+            {
+                if( k==0 || photons )
+                {
                     blocks[i][j][k].r = (double)(rand()%80)/255.0 + 0.70;
                     blocks[i][j][k].g = (double)(rand()%60)/255.0 + 0.60;
                     blocks[i][j][k].b = (double)(rand()%40)/255.0 + 0.20;
                     blocks[i][j][k].a = 1.0; //(double)(rand()%100+1)*0.01;
-#ifndef PHOTONMODE
                 }
-                else if( i>(BSIZE*2)/5 && i<(BSIZE*3)/5 && j>(BSIZE*2)/5 && j<(BSIZE*3)/5 ) // shiny area!
+                else if( i>(c_bsize*2)/5 && i<(c_bsize*3)/5 && j>(c_bsize*2)/5 && j<(c_bsize*3)/5 ) // shiny area!
                 {
-                    if( k<BSIZE/5 )
+                    if( k<c_bsize/5 )
                         blocks[i][j][k] = blocks[i][j][k-1];
                     else
                     {
@@ -119,7 +159,7 @@ void PIXELMACHINE::build_terrain()
                         blocks[i][j][k].a = 0.0;
                     }
                 }
-                else if( terrain[i][j] >= k*(1000.0/(double)BSIZE ) )
+                else if( terrain[i][j] >= k*(1000.0/(double)c_bsize ) )
                 {
                     blocks[i][j][k] = blocks[i][j][k-1];
                 }
@@ -130,7 +170,6 @@ void PIXELMACHINE::build_terrain()
                     blocks[i][j][k].b = 0.0;
                     blocks[i][j][k].a = 0.0;
                 }
-#endif
             }
 }
 
@@ -139,99 +178,89 @@ void PIXELMACHINE::generate_objects()
 {
     int i;
 
-#ifndef PHOTONMODE
-    sun[0].x = (double)(rand()%1500) - 250.0;
-    sun[0].y = (double)(rand()%1500) - 250.0;
-    sun[0].z = (double)(rand()%700) + 100.0;
-
-    for(i=0; i<SUNS; i++)
+    if( !photons )
     {
-        sun[i].x = sun[0].x + ((double)i)*0.4;
-        sun[i].y = sun[0].y + ((double)i)*0.3;
-        sun[i].z = sun[0].z + ((double)i)*0.2;
+        sun[0].x = (double)(rand()%1500) - 250.0;
+        sun[0].y = (double)(rand()%1500) - 250.0;
+        sun[0].z = (double)(rand()%700) + 100.0;
+
+        cam.x = (double)(rand()%900) + 50.0;
+        cam.y = (double)(rand()%900) + 50.0;
+        cam.z = terrain[int(cam.x/c_sqsize)][int(cam.y/c_sqsize)] + (double)(rand()%150) + 50.0;
+
+        tar.x = (double)(rand()%900) + 50.0;
+        tar.y = (double)(rand()%900) + 50.0;
+        tar.z = cam.z - (double)(rand()%400);
+
+        for(i=0; i<c_spheres; i++)
+        {
+            sphere[i].center.x = (double)(rand()%10000)*0.1;
+            sphere[i].center.y = (double)(rand()%10000)*0.1;
+            sphere[i].center.z = (double)(rand()%3500)*0.1;
+            sphere[i].radius = (double)(rand()%10000)*0.005;
+            sphere[i].color.a = 1.0;
+            sphere[i].color.r = (double)(rand()%255)/255.0;
+            sphere[i].color.g = (double)(rand()%255)/255.0;
+            sphere[i].color.b = (double)(rand()%255)/255.0;
+        }
     }
-
-    cam.x = (double)(rand()%900) + 50.0;
-    cam.y = (double)(rand()%900) + 50.0;
-    cam.z = terrain[int(cam.x/SQSIZE)][int(cam.y/SQSIZE)] + (double)(rand()%150) + 50.0;
-
-    tar.x = (double)(rand()%900) + 50.0;
-    tar.y = (double)(rand()%900) + 50.0;
-    tar.z = cam.z - (double)(rand()%400);
-
-    for(i=0; i<SPHERES; i++)
+    else
     {
-        sphere[i].center.x = (double)(rand()%10000)*0.1;
-        sphere[i].center.y = (double)(rand()%10000)*0.1;
-        sphere[i].center.z = (double)(rand()%3500)*0.1;
-        sphere[i].radius = (double)(rand()%10000)*0.005;
-        sphere[i].color.a = 1.0;
-        sphere[i].color.r = (double)(rand()%255)/255.0;
-        sphere[i].color.g = (double)(rand()%255)/255.0;
-        sphere[i].color.b = (double)(rand()%255)/255.0;
+        cam.x = 778.0;
+        cam.y = 621.0;
+        cam.z = 631.0;
+        tar.x = 625.0;
+        tar.y = 625.0;
+        tar.z = 624.0;
+        sun[0].x = 625.0;
+        sun[0].y = 625.0;
+        sun[0].z = 749.0;
+
+        blocks[2][2][2].a = 0.0;
+
+        //black
+        blocks[3][2][2].r = 0.2; blocks[3][2][2].g = 0.15; blocks[3][2][2].b = 0.1;
+        //main wall
+        blocks[1][2][2].r = 1.2; blocks[1][2][2].g = 1.1; blocks[1][2][2].b = 0.70;
+        //floor
+        blocks[2][2][1].r = 1.2; blocks[2][2][1].g = 1.1; blocks[2][2][1].b = 0.70;
+        //ceiling
+        blocks[2][2][3].r = 0.8; blocks[2][2][3].g = 0.7; blocks[2][2][3].b = 0.5;
+        // right wall
+        blocks[2][3][2].r = 0.4; blocks[2][3][2].g = 0.55; blocks[2][3][2].b = 0.35;
+        // left wall
+        blocks[2][1][2].r = 0.8; blocks[2][1][2].g = 0.5; blocks[2][1][2].b = 0.3;
+
+        sphere[0].center.x = 594.0;
+        sphere[0].center.y = 595.0;
+        sphere[0].center.z = 702.0;
+        sphere[0].radius = 25.0;
+
+        sphere[1].center.x = 540.0;
+        sphere[1].center.y = 728.0;
+        sphere[1].center.z = 540.0;
+        sphere[1].radius = 40.0;
+
+        sphere[2].center.x = 585.0;
+        sphere[2].center.y = 584.0;
+        sphere[2].center.z = 510.0;
+        sphere[2].radius = 10.0;
+
+        sphere[3].center.x = 540.0;
+        sphere[3].center.y = 730.0;
+        sphere[3].center.z = 620.0;
+        sphere[3].radius = 40.0;
+
+        sphere[4].center.x = 585.0;
+        sphere[4].center.y = 584.0;
+        sphere[4].center.z = 530.0;
+        sphere[4].radius = 10.0;
+
+        sphere[5].center.x = 585.0;
+        sphere[5].center.y = 584.0;
+        sphere[5].center.z = 550.0;
+        sphere[5].radius = 10.0;
     }
-#endif
-
-#ifdef PHOTONMODE
-    cam.x = 778.0;
-    cam.y = 621.0;
-    cam.z = 631.0;
-    tar.x = 625.0;
-    tar.y = 625.0;
-    tar.z = 624.0;
-    sun[0].x = 625.0;
-    sun[0].y = 625.0;
-    sun[0].z = 749.0;
-    sun[1].x = 998.0;
-    sun[1].y = 721.0;
-    sun[1].z = 590.0;
-
-    blocks[2][2][2].a = 0.0;
-
-    //black
-    blocks[3][2][2].r = 0.2; blocks[3][2][2].g = 0.15; blocks[3][2][2].b = 0.1;
-    //main wall
-    blocks[1][2][2].r = 1.2; blocks[1][2][2].g = 1.1; blocks[1][2][2].b = 0.70;
-    //floor
-    blocks[2][2][1].r = 1.2; blocks[2][2][1].g = 1.1; blocks[2][2][1].b = 0.70;
-    //ceiling
-    blocks[2][2][3].r = 0.8; blocks[2][2][3].g = 0.7; blocks[2][2][3].b = 0.5;
-    // right wall
-    blocks[2][3][2].r = 0.4; blocks[2][3][2].g = 0.55; blocks[2][3][2].b = 0.35;
-    // left wall
-    blocks[2][1][2].r = 0.8; blocks[2][1][2].g = 0.5; blocks[2][1][2].b = 0.3;
-
-
-    sphere[0].center.x = 594.0;
-    sphere[0].center.y = 595.0;
-    sphere[0].center.z = 702.0;
-    sphere[0].radius = 25.0;
-
-    sphere[1].center.x = 540.0;
-    sphere[1].center.y = 728.0;
-    sphere[1].center.z = 540.0;
-    sphere[1].radius = 40.0;
-
-    sphere[2].center.x = 585.0;
-    sphere[2].center.y = 584.0;
-    sphere[2].center.z = 510.0;
-    sphere[2].radius = 10.0;
-
-    sphere[3].center.x = 540.0;
-    sphere[3].center.y = 730.0;
-    sphere[3].center.z = 620.0;
-    sphere[3].radius = 40.0;
-
-    sphere[4].center.x = 585.0;
-    sphere[4].center.y = 584.0;
-    sphere[4].center.z = 530.0;
-    sphere[4].radius = 10.0;
-
-    sphere[5].center.x = 585.0;
-    sphere[5].center.y = 584.0;
-    sphere[5].center.z = 550.0;
-    sphere[5].radius = 10.0;
-#endif
 }
 
 
@@ -261,48 +290,32 @@ void PIXELMACHINE::run()
     
     for(i=0;i<frames;i++)
     {
-        //system(SYSTEMCLEARSTR);
-        //printf("Previewing...\n");
-        //render(PREVIEWW,PREVIEWH,true);
-        //preview(PREVIEWW,PREVIEWH);
-        //savebmp("./preview.bmp",PREVIEWW,PREVIEWH);
-        //printf("<Space> render   <W/A/S/D/R/F> camera   <I/K/J/L/P/;> target\n");
-        //ch = _getch();
-        
-        //printf("Rendering...\n");
-#ifndef PHOTONMODE
-        strcpy(statustext,"Rendering");
-        render(w,h,false);
-        strcpy(statustext,"Ready");
-#else
-        strcpy(statustext,"Photon rendering");
-        render_photons(cam,tar,w,h,false);
-        strcpy(statustext,"Ready");
-#endif
+        if( !photons )
+        {
+            strcpy(statustext,"Rendering");
+            render(w,h,false);
+            strcpy(statustext,"Ready");
+        }
+        else
+        {
+            strcpy(statustext,"Photon rendering");
+            render_photons(cam,tar,w,h,false);
+            strcpy(statustext,"Ready");
+        }
 
         printf("Writing frame %.4d ...\n",i);
         if( frames > 1 )
         {
-#ifdef unix
-            mkdir("./video",0777);
-#else
-            mkdir("./video");
-#endif
+            mkdir("./video" UNIX_MKDIR_PERMS);
             sprintf(str,"./video/frame%.4d.bmp",i);
             savebmp(str,w,h);
         }
         else
         {
-#ifdef unix
-            mkdir("./images",0777);
-#else
-            mkdir("./images");
-#endif
+            mkdir("./images" UNIX_MKDIR_PERMS);
             unsigned t = (unsigned)time(NULL);
             sprintf(str,"./images/seed%d_%d.bmp",seed,t);
             savebmp(str,w,h);
-            //sprintf(str,"start ./images/img%d.bmp",t);
-            //system(str);
         }
 
         cam.x -= lin.x/2.0;
@@ -314,7 +327,7 @@ void PIXELMACHINE::run()
         for(j=0;j<SUNS;j++)
             sun[j].z += 0.8;
 
-        for(j=0;j<SPHERES;j++)
+        for(j=0;j<c_spheres;j++)
         {
             switch( j%3 )
             {
@@ -686,25 +699,22 @@ void PIXELMACHINE::render_photons( V cam, V tar, int w, int h, bool quiet )
     
 
     // blast photons around and feed the camera
-    ration = (PHOTONS/100+threads-1)/threads;
+    ration = (photons*10000)/threads;
     for(i=0; i<100; i++)
     {
         int tn;
-        int todo;
-        todo = PHOTONS/100;
         for(tn=0; tn<threads; tn++) // give each thread a chunk of 1% of all work
         {
             pa[tn].c.r = 1.0;
             pa[tn].c.g = 1.0;
             pa[tn].c.b = 1.0;
             pa[tn].c.a = 1.0;
-            pa[tn].ration = (tn<threads-1)?(ration):(todo);
+            pa[tn].ration = ration;
             pa[tn].seed = seed + i*threads + tn;
             pa[tn].lock = lock;
             pa[tn].threadid = tn;
             pa[tn].pm = this;
             kids[tn] = SDL_CreateThread(ext_photon_thread,pa+tn);
-            todo -= ration;
         }
 
         for(tn=0; tn<threads; tn++) // wait for all threads
@@ -774,7 +784,6 @@ int PIXELMACHINE::photon_thread( void *data )
 
     for(i=0; i<pa->ration; i++)
     {
-        //SDL_mutexP(lock);
         o.x = sun[0].x + dsfmt_genrand_close_open(&dsfmt)*10.0-20.0;
         o.y = sun[0].y + dsfmt_genrand_close_open(&dsfmt)*5.0-10.0;
         o.z = sun[0].z;
@@ -785,7 +794,6 @@ int PIXELMACHINE::photon_thread( void *data )
             v.z = dsfmt_genrand_close_open(&dsfmt)*-1.0;
         }
         while( v.x*v.x + v.y*v.y + v.z*v.z > 1.0 );
-        //SDL_mutexV(lock);
 
         raytrace(pa->c,o,v,MODE_PHOTON,0);
     }
@@ -830,7 +838,7 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
     potp = 99999999.0;
     hitobject = -1;
     pothitobject = -1;
-    for(i=0; i<SPHERES; i++)
+    for(i=0; i<c_spheres; i++)
     {
         V v;
         v = ray;
@@ -856,7 +864,8 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
         blockz = (int)((cam.z+p*ray.z)/blocksize);
 
         // hit sky
-        if( blockx<1 || blockx>BSIZE-1 || blocky<1 || blocky>BSIZE-1 || blockz<0 || blockz>BSIZE-1 || k>1000 || (mode==MODE_LIGHTTEST && p>=1.0) )
+        if( blockx<1 || blockx>c_bsize-1 || blocky<1 || blocky>c_bsize-1 || blockz<0 || blockz>c_bsize-1
+            || k>1000 || (mode==MODE_LIGHTTEST && p>=1.0) )
         {
             if( mode==MODE_CAMRAY && pixelindex==NO_PIXEL )
             {
@@ -908,7 +917,7 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
                     subtract( beam, sun[m], hit );
                     raytrace( light, hit, beam, MODE_LIGHTTEST, 0 );
 
-                    double falloff = FALLOFF/(beam.x*beam.x + beam.y*beam.y + beam.z*beam.z);
+                    double falloff = c_falloff/(beam.x*beam.x + beam.y*beam.y + beam.z*beam.z);
                     light.r = light.r*0.0+(1.0-light.a)*falloff;
                     light.g = light.g*0.0+(1.0-light.a)*falloff;
                     light.b = light.b*0.0+(1.0-light.a)*falloff;
@@ -925,7 +934,8 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
                 sidefactor = (side==XY?1.0:(side==XZ?0.9:0.8));
             }
 
-            if( blockz==0 || hitobject>=0 /**/|| blockx>(BSIZE*2)/5 && blockx<(BSIZE*3)/5 && blocky>(BSIZE*2)/5 && blocky<(BSIZE*3)/5/**/ ) //reflect!
+            if( blockz==0 || hitobject>=0 || blockx>(c_bsize*2)/5 && blockx<(c_bsize*3)/5 
+                                          && blocky>(c_bsize*2)/5 && blocky<(c_bsize*3)/5 ) //reflect!
             {
                 if( mode!=MODE_PHOTON && pixelindex==NO_PIXEL )
                 {
@@ -933,13 +943,6 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
                     finallight.g += 0.7*(1.0-finallight.g);
                     finallight.b += 0.7*(1.0-finallight.b);
                 }
-
-                //if( mode==MODE_PHOTON )
-                //{
-                //    if( rand()%50==0 )
-                //        return color; // i've decided metallic objects absorb 2% of photons
-                //}
-
 
                 V ray2 = ray;
 
@@ -949,15 +952,9 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
 
                     subtract( rad, hit, sphere[hitobject].center );
 
-                    //mirror( ray2, ray, rad );
-
                     ray2 = ray;
                     normalize(rad, 2.0*(ray.x*rad.x+ray.y*rad.y+ray.z*rad.z)/sphere[hitobject].radius );
                     subtract(ray2,ray,rad);
-
-                    //ray2.x = -ray2.x;
-                    //ray2.y = -ray2.y;
-                    //ray2.z = -ray2.z;
                 }
                 else if( side==XY )
                     ray2.z = -ray.z;
@@ -966,31 +963,26 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
                 else 
                     ray2.x = -ray.x;
 
-#ifndef PHOTONMODE                
-                double scatter;
-                if( hitobject>=0 )
+                if( !photons )
                 {
-                    scatter = 0.0;
-                    ray2.x *= 1.0 + (double)(rand()%1000)*scatter;
-                    ray2.y *= 1.0 + (double)(rand()%1000)*scatter;
-                    ray2.z *= 1.0 + (double)(rand()%1000)*scatter;
+                    double scatter;
+                    if( hitobject>=0 )
+                    {
+                        scatter = 0.0;
+                        ray2.x *= 1.0 + (double)(rand()%1000)*scatter;
+                        ray2.y *= 1.0 + (double)(rand()%1000)*scatter;
+                        ray2.z *= 1.0 + (double)(rand()%1000)*scatter;
+                    }
+                    else
+                    {
+                        scatter = SCATTER;
+                        ray2.x *= 1.0 + (double)(rand()%1000)*scatter + sin(hit.x)*0.1;
+                        ray2.y *= 1.0 + (double)(rand()%1000)*scatter + sin(hit.y)*0.1;
+                        ray2.z *= 1.0 + (double)(rand()%1000)*scatter;
+                    }
                 }
-                else
-                {
-                    scatter = SCATTER;
-                    ray2.x *= 1.0 + (double)(rand()%1000)*scatter + sin(hit.x)*0.1;
-                    ray2.y *= 1.0 + (double)(rand()%1000)*scatter + sin(hit.y)*0.1;
-                    ray2.z *= 1.0 + (double)(rand()%1000)*scatter;
-                }
-
-                
-#endif
-
-                //printf("(%d %d %d)",blockx,blocky,blockz);
-                //getch();
 
                 raytrace(color, hit, ray2, mode, bounce+1, pixelindex);
-                
 
                 if( mode!=MODE_PHOTON && pixelindex==NO_PIXEL )
                 {
@@ -1017,7 +1009,6 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
                 temp.b = c->b*color.b;
 
                 feed(temp,hit);
-
 
                 //INDIRECT/DIFFUSE BOUNCE HERE:
                 if( rand()%2==0 )
@@ -1089,45 +1080,27 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
             side = XY;
             p = p2;
         }
-
 /*
-        // THE NEW PARALLAX (didn't work, unfortunately)
-        if( ray.z<0.0 && rand()%100<98 )
+        if( spheremania && blockz>0 && blocks[blockx][blocky][blockz-1].a>0.0 ) // crazy speheres!!
         {
-            // find current space block
-            blockx = (int)((cam.x+p*ray.x)/blocksize);
-            blocky = (int)((cam.y+p*ray.y)/blocksize);
-            blockz = (int)((cam.z+p*ray.z)/blocksize);
-            if( blockx<1 || blockx>BSIZE-1 || blocky<1 || blocky>BSIZE-1 || blockz<0 || blockz>BSIZE-1 )
-            {
-                side = XY;
-                p = (blocksize-cam.z)/(ray.z) + 0.00001;
-            }
-        }
-*/
-
-/*
-        if( blockz>0 && blocks[blockx][blocky][blockz-1].a>0.0 ) // crazy speheres!!
-        {
-            sphere[SPHERES].center.x = ((double)blockx+0.5)*SQSIZE;
-            sphere[SPHERES].center.y = ((double)blocky+0.5)*SQSIZE;
-            sphere[SPHERES].center.z = ((double)blockz+0.5)*SQSIZE;
-            sphere[SPHERES].radius = SQSIZE*0.4;
-            sphere[SPHERES].color.r = 1.0;
-            sphere[SPHERES].color.g = 1.0;
-            sphere[SPHERES].color.b = 1.0;
-            sphere[SPHERES].color.a = 1.0;
-            CollideRaySphere(p0,cam,ray,sphere[SPHERES].center,sphere[SPHERES].radius);
+            sphere[c_spheres].center.x = ((double)blockx+0.5)*c_sqsize;
+            sphere[c_spheres].center.y = ((double)blocky+0.5)*c_sqsize;
+            sphere[c_spheres].center.z = ((double)blockz+0.5)*c_sqsize;
+            sphere[c_spheres].radius = c_sqsize*0.4;
+            sphere[c_spheres].color.r = 1.0;
+            sphere[c_spheres].color.g = 1.0;
+            sphere[c_spheres].color.b = 1.0;
+            sphere[c_spheres].color.a = 1.0;
+            CollideRaySphere(p0,cam,ray,sphere[c_spheres].center,sphere[c_spheres].radius);
 
             if(p0!=NO_COLLISION && p0+0.00001 < p)
             {
-                hitobject = SPHERES;
+                hitobject = c_spheres;
                 side = XY;
                 p = p0+0.00001;
             }
         }
-/**/
-
+*/
         if( p>potp )
         {
             hitobject = pothitobject;
@@ -1135,12 +1108,9 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
             p = potp;
         }
 
-
         hit.x = (p-0.00002)*ray.x + cam.x;
         hit.y = (p-0.00002)*ray.y + cam.y;
         hit.z = (p-0.00002)*ray.z + cam.z;
-
-        //printf( "%.4d %.4d %.4d\n", blockx, blocky, blockz );
     }
 
     if( mode!=MODE_PHOTON )

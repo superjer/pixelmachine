@@ -29,23 +29,20 @@
 #include "dSFMT.h"
 
 
-//#define PHOTONMODE
-
-
-#ifndef PHOTONMODE
-#define TERDIV  8   // terrain divisions (powers of 2 ONLY!)
-#define TERSECS 16    // sections per division
-                     // this will work out to (TERDIV*TERSECS+1)^3 cubes!!
+#define TERDIV  8     // terrain divisions (powers of 2 ONLY!)
+#define TERSECS 16    // sections per division, this will work out to (TERDIV*TERSECS+1)^3 cubes!!
 #define FALLOFF 600000.0
-#else
-#define TERDIV  1   // terrain divisions (powers of 2 ONLY!)
-#define TERSECS 3    // sections per division
-#define FALLOFF 30000.0
-#endif
+
+#define PH_TERDIV  1  // terrain divisions (powers of 2 ONLY!)
+#define PH_TERSECS 3  // sections per division
+#define PH_FALLOFF 30000.0
 
 
 #define BSIZE (TERDIV*TERSECS+1)
 #define SQSIZE (1000.0/(double)BSIZE)
+
+#define PH_BSIZE (PH_TERDIV*PH_TERSECS+1)
+#define PH_SQSIZE (1000.0/(double)PH_BSIZE)
 
 #define PREVIEWW 80
 #define PREVIEWH 60
@@ -60,12 +57,8 @@
 
 #define SUNS 1
 
-#ifndef PHOTONMODE
 #define SPHERES 80
-#else
-#define SPHERES 6
-#endif
-
+#define PH_SPHERES 6
 
 #define PATCHDIM 250
 #define PHOTONRADIUS 1.0
@@ -83,9 +76,13 @@
 #define MODE_LIGHTTEST 1
 #define MODE_PHOTON 2
 
-#define PHOTONS 20000000
-
 #define INVRAND ((double)2.0/(double)RAND_MAX)
+
+#ifdef unix
+# define UNIX_MKDIR_PERMS ,0777
+#else
+# define UNIX_MKDIR_PERMS
+#endif
 
 
 struct PIXELMACHINE
@@ -123,22 +120,30 @@ struct PIXELMACHINE
     P *patch[PATCHDIM][PATCHDIM][PATCHDIM];
     P **patchterm[PATCHDIM][PATCHDIM][PATCHDIM];
     int tempx,tempy,tempz;
-    double terrain[BSIZE][BSIZE];
+    double **terrain;
     unsigned char *img;
     COLOR *dimg;
     int w;
     int h;
     int multis;
     int threads;
+    int photons;
     int frames;
     unsigned seed;
-    COLOR blocks[BSIZE][BSIZE][BSIZE];
+    int c_terdiv;
+    int c_tersecs;
+    double c_falloff;
+    int c_bsize;
+    double c_sqsize;
+    int c_spheres;
+    COLOR ***blocks;
     double blocksize;
     double tarw;
     double pixpitch;
     double subpitch;
     V sun[SUNS];
-    SPHERE sphere[SPHERES+1];
+    SPHERE *sphere;
+    //bool spheremania;
     bool *busy;
     bool running;
     V cam;
@@ -148,12 +153,12 @@ struct PIXELMACHINE
     int reg_alloc;
     SDL_mutex *lock;
     bool cancel;
-    char statustext[80];
+    char statustext[200];
 
     PIXELMACHINE();
     ~PIXELMACHINE();
 
-    void init(unsigned seed,int w,int h,int multis,int threads);
+    void init(unsigned _seed,int _w,int _h,int _multis,int _threads,int _photons);
     void build_terrain();
     void generate_objects();
     void run();

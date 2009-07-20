@@ -34,7 +34,7 @@
 #define FALLOFF 600000.0
 
 #define PH_TERDIV  1  // terrain divisions (powers of 2 ONLY!)
-#define PH_TERSECS 3  // sections per division
+#define PH_TERSECS 15  // sections per division
 #define PH_FALLOFF 30000.0
 
 

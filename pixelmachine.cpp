@@ -206,34 +206,47 @@ void PIXELMACHINE::generate_objects()
   }
   else
   {
-    cam.x = 778.0;
+    cam.x = 728.0;
     cam.y = 621.0;
     cam.z = 631.0;
     tar.x = 625.0;
     tar.y = 625.0;
-    tar.z = 624.0;
+    tar.z = 604.0;
     sun[0].x = 625.0;
     sun[0].y = 625.0;
     sun[0].z = 749.0;
 
-    blocks[2][2][2].a = 0.0;
+
+#   define SC 4
+#   define B(ii,jj,kk,rr,gg,bb,aa) {int i2=ii*SC;int j2=jj*SC;int k2=kk*SC;int i,j,k;\
+                                   for(i=i2;i<i2+SC;i++) for(j=j2;j<j2+SC;j++) for(k=k2;k<k2+SC;k++)\
+                                   { blocks[i][j][k].r=rr; blocks[i][j][k].g=gg; blocks[i][j][k].b=bb; blocks[i][j][k].a=aa;}}
+
+    //space
+    B(2,2,2, 0.00,0.00,0.00,0.00);
+    B(3,2,2, 0.00,0.00,0.00,0.00);
 
     //black
-    blocks[3][2][2].r = 0.2; blocks[3][2][2].g = 0.15; blocks[3][2][2].b = 0.1;
+    //B(3,2,2, 0.20,0.15,0.10,1.00);
     //main wall
-    blocks[1][2][2].r = 1.2; blocks[1][2][2].g = 1.1; blocks[1][2][2].b = 0.70;
+    B(1,2,2, 1.20,1.10,0.70,1.00);
     //floor
-    blocks[2][2][1].r = 1.2; blocks[2][2][1].g = 1.1; blocks[2][2][1].b = 0.70;
+    B(2,2,1, 1.20,1.10,0.70,1.00);
     //ceiling
-    blocks[2][2][3].r = 0.8; blocks[2][2][3].g = 0.7; blocks[2][2][3].b = 0.5;
+    B(2,2,3, 0.80,0.70,0.50,1.00);
     // right wall
-    blocks[2][3][2].r = 0.4; blocks[2][3][2].g = 0.55; blocks[2][3][2].b = 0.35;
+    B(2,3,2, 0.40,0.55,0.35,1.00);
     // left wall
-    blocks[2][1][2].r = 0.8; blocks[2][1][2].g = 0.5; blocks[2][1][2].b = 0.3;
+    B(2,1,2, 0.80,0.50,0.30,1.00);
+    
+    blocks[8][8][8 ].r=1.20; blocks[8][8][8 ].g=1.10; blocks[8][8][8 ].b=0.70; blocks[8][8][8 ].a=1.00;
+    blocks[8][8][10].r=1.20; blocks[8][8][10].g=1.10; blocks[8][8][10].b=0.70; blocks[8][8][10].a=1.00;
 
-    sphere[0].center.x = 594.0;
-    sphere[0].center.y = 595.0;
-    sphere[0].center.z = 702.0;
+#   undef B
+
+    sphere[0].center.x = 525.0;
+    sphere[0].center.y = 555.0;
+    sphere[0].center.z = 584.5;
     sphere[0].radius = 25.0;
 
     sphere[1].center.x = 540.0;
@@ -929,8 +942,9 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
         sidefactor = (side==XY?1.0:(side==XZ?0.9:0.8));
       }
 
-      if( blockz==0 || hitobject>=0 || blockx>(c_bsize*2)/5 && blockx<(c_bsize*3)/5 
-                      && blocky>(c_bsize*2)/5 && blocky<(c_bsize*3)/5 ) //reflect!
+      if( blockz==0 || hitobject>=0 || 
+          !photons && blockx>(c_bsize*2)/5 && blockx<(c_bsize*3)/5
+                   && blocky>(c_bsize*2)/5 && blocky<(c_bsize*3)/5 ) //reflect!
       {
         if( mode!=MODE_PHOTON && pixelindex==NO_PIXEL )
         {

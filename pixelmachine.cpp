@@ -7,7 +7,7 @@ PIXELMACHINE::PIXELMACHINE()
 {
     cancel = false;
     running = false;
-    //spheremania = false;
+    spheremania = false;
     blocks = NULL;
     terrain = NULL;
     sphere = NULL;
@@ -725,7 +725,7 @@ void PIXELMACHINE::render_photons( V cam, V tar, int w, int h, bool quiet )
         if( cancel )
             break;
 
-        if( i==0 || i%10==9 )
+        //if( i==0 || i%10==9 )
         {
             int i;
             // adjust dimg vals (HDR-like) and copy to bitmap
@@ -778,26 +778,25 @@ int PIXELMACHINE::photon_thread( void *data )
     int i;
     V o;
     V v;
-    dsfmt_t dsfmt;
-
-    dsfmt_init_gen_rand(&dsfmt,pa->seed);
+    void *hrand = sj_srand(pa->seed);
 
     for(i=0; i<pa->ration; i++)
     {
-        o.x = sun[0].x + dsfmt_genrand_close_open(&dsfmt)*10.0-20.0;
-        o.y = sun[0].y + dsfmt_genrand_close_open(&dsfmt)*5.0-10.0;
+        o.x = sun[0].x + sj_rand(hrand)*10.0-20.0;
+        o.y = sun[0].y + sj_rand(hrand)*5.0-10.0;
         o.z = sun[0].z;
         do
         {
-            v.x = dsfmt_genrand_close_open(&dsfmt)*2.0-1.0;
-            v.y = dsfmt_genrand_close_open(&dsfmt)*2.0-1.0;
-            v.z = dsfmt_genrand_close_open(&dsfmt)*-1.0;
+            v.x = sj_rand(hrand)*2.0-1.0;
+            v.y = sj_rand(hrand)*2.0-1.0;
+            v.z = sj_rand(hrand)*-1.0;
         }
         while( v.x*v.x + v.y*v.y + v.z*v.z > 1.0 );
 
         raytrace(pa->c,o,v,MODE_PHOTON,0);
     }
 
+    sj_drand(hrand);
     return 0;
 }
 
@@ -1080,7 +1079,7 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
             side = XY;
             p = p2;
         }
-/*
+
         if( spheremania && blockz>0 && blocks[blockx][blocky][blockz-1].a>0.0 ) // crazy speheres!!
         {
             sphere[c_spheres].center.x = ((double)blockx+0.5)*c_sqsize;
@@ -1100,7 +1099,7 @@ COLOR &PIXELMACHINE::raytrace( COLOR &color, const V &cam, const V &ray, int mod
                 p = p0+0.00001;
             }
         }
-*/
+
         if( p>potp )
         {
             hitobject = pothitobject;

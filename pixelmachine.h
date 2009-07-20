@@ -1,6 +1,6 @@
 
-#ifndef __PIXELMACHINE_H__
-#define __PIXELMACHINE_H__
+#ifndef PIXELMACHINE_H__
+#define PIXELMACHINE_H__
 
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -26,7 +26,7 @@
 #include "font.h"
 #include "collision.h"
 
-#include "dSFMT.h"
+#include "sjrand.h"
 
 
 #define TERDIV  8     // terrain divisions (powers of 2 ONLY!)
@@ -143,7 +143,7 @@ struct PIXELMACHINE
     double subpitch;
     V sun[SUNS];
     SPHERE *sphere;
-    //bool spheremania;
+    bool spheremania;
     bool *busy;
     bool running;
     V cam;
@@ -181,4 +181,4 @@ int ext_render_thread( void *data );
 int ext_photon_thread( void *data );
 
 
-#endif //__PIXELMACHINE_H__
+#endif //PIXELMACHINE_H__

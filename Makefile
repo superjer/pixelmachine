@@ -1,5 +1,5 @@
 EXE_NAME = pixelmachine
-OBJS = main.o pixelmachine.o font.o collision.o sjui.o dSFMT.o
+OBJS = main.o pixelmachine.o font.o collision.o sjui.o
 CC = g++
 FLAGS = -Wall -O3 -s
 LIBS = -lSDL -lm

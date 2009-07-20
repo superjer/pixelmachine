@@ -46,7 +46,7 @@ SDL_Surface *sdlscreen = NULL;
 SDL_Surface *sdlrender = NULL;
 SDL_Thread *thread;
 const SDL_VideoInfo *pinfo;
-PIXELMACHINE pixelmachine;
+PIXELMACHINE *pixelmachine;
 SJUI ui;
 SJUI_HANDLE h_menu,h_render;
 
@@ -69,6 +69,7 @@ int main( int argc, char* argv[] )
     int threads = THREADS;
     int photons = PHOTONS;
     unsigned seed = (unsigned)-1;
+    bool preview = true;
 
     // Process cmd line args
     for(i=1; i<argc; i++)
@@ -122,8 +123,10 @@ int main( int argc, char* argv[] )
     ui.set_caption(h_menu,"Click to render...");
     ui.set_caption(h_render,"Loading");
 
-    //pm setup
-    pixelmachine.init(seed,w,h,multis,threads,photons);
+    //pm preview render setup
+    pixelmachine = new PIXELMACHINE;
+    pixelmachine->init(seed,100,75,1,threads,(photons?1:0));
+    thread = SDL_CreateThread(run_pixel_machine,NULL);
 
     // MAIN LOOP
     while( 1 )
@@ -137,15 +140,25 @@ int main( int argc, char* argv[] )
             SetVideo( event.resize.w, event.resize.h );
             break;
         case SDL_MOUSEBUTTONDOWN:
-            if( !pixelmachine.running )
+            if( preview )
+            {
+                //pm full render go!
+                preview = false;
+                pixelmachine->cancel = true;
+                SDL_WaitThread(thread,NULL); //BUG: thread may not be valid?
+                delete pixelmachine;
+                pixelmachine = new PIXELMACHINE;
+                pixelmachine->init(seed,w,h,multis,threads,photons);
                 thread = SDL_CreateThread(run_pixel_machine,NULL);
+            }
             break;
         case SDL_KEYDOWN:
             ;
             break;
         case SDL_QUIT:
-            pixelmachine.cancel = true;
-            SDL_WaitThread(thread,NULL);
+            pixelmachine->cancel = true;
+            SDL_WaitThread(thread,NULL); //BUG: thread may not be valid?
+            delete pixelmachine;
             Cleanup();
             break;
         }
@@ -167,7 +180,7 @@ int main( int argc, char* argv[] )
 
 int run_pixel_machine( void *data )
 {
-    pixelmachine.run();
+    pixelmachine->run();
     return 0;
 }
 
@@ -191,15 +204,15 @@ void Render()
     {
         if( !SDL_LockSurface(sdlrender) )
         {
-            while( pixelmachine.pop_region(&rect) )
+            while( pixelmachine->pop_region(&rect) )
                 for(i=rect.x; i<rect.x+rect.w; i++)
                     for(j=rect.y; j<rect.y+rect.h; j++)
                     {
-                        Uint8 b = pixelmachine.img[(i+j*pixelmachine.w)*3+0];
-                        Uint8 g = pixelmachine.img[(i+j*pixelmachine.w)*3+1];
-                        Uint8 r = pixelmachine.img[(i+j*pixelmachine.w)*3+2];
-                        ratiox = (double)winw/(double)pixelmachine.w;
-                        ratioy = (double)winh/(double)pixelmachine.h;
+                        Uint8 b = pixelmachine->img[(i+j*pixelmachine->w)*3+0];
+                        Uint8 g = pixelmachine->img[(i+j*pixelmachine->w)*3+1];
+                        Uint8 r = pixelmachine->img[(i+j*pixelmachine->w)*3+2];
+                        ratiox = (double)winw/(double)pixelmachine->w;
+                        ratioy = (double)winh/(double)pixelmachine->h;
                         for(m=(int)(i*ratiox);m<(int)((i+1)*ratiox);m++)
                             for(n=(int)(j*ratioy);n<(int)((j+1)*ratioy);n++)
                                 SDL_SetPixel(sdlrender,m,n,r,g,b);
@@ -209,7 +222,7 @@ void Render()
         SDL_BlitSurface(sdlrender,NULL,sdlscreen,NULL);
     }
 
-    ui.set_caption(h_render,pixelmachine.statustext);
+    ui.set_caption(h_render,pixelmachine->statustext);
     ui.paint(sdlscreen);
     SDL_Flip(sdlscreen);
 }

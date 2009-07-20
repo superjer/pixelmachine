@@ -118,7 +118,6 @@ struct PIXELMACHINE
         int l,r,t,b;
     };
     P *patch[PATCHDIM][PATCHDIM][PATCHDIM];
-    P **patchterm[PATCHDIM][PATCHDIM][PATCHDIM];
     int tempx,tempy,tempz;
     double **terrain;
     unsigned char *img;

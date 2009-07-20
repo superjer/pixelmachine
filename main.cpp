@@ -11,6 +11,8 @@
 **
 */
 
+#include <SDL/SDL.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,11 +20,18 @@
 #include <memory.h>
 #include <time.h>
 
-//#ifndef unix
-//#include <direct.h>
-//#endif
-
-#include <SDL/SDL.h>
+#define NICEME (0)
+#ifdef unix
+# include <sys/time.h>
+# include <sys/resource.h>
+# undef NICEME
+# define NICEME (setpriority(PRIO_PROCESS,0,10))
+#endif
+#ifdef WIN32
+# include <windows.h>
+# undef NICEME
+# define NICEME (SetPriorityClass(GetCurrentProcess(),BELOW_NORMAL_PRIORITY_CLASS))
+#endif
 
 #include "pixelmachine.h"
 #include "sjui.h"
@@ -70,6 +79,8 @@ int main( int argc, char* argv[] )
     int photons = PHOTONS;
     unsigned seed = (unsigned)-1;
     bool preview = true;
+
+    NICEME;
 
     // Process cmd line args
     for(i=1; i<argc; i++)

@@ -782,13 +782,12 @@ int PIXELMACHINE::photon_thread( void *data )
     o.x = sun[0].x + sj_rand(hrand)*10.0-20.0;
     o.y = sun[0].y + sj_rand(hrand)*5.0-10.0;
     o.z = sun[0].z;
-    do
-    {
-      v.x = sj_rand(hrand)*2.0-1.0;
-      v.y = sj_rand(hrand)*2.0-1.0;
-      v.z = sj_rand(hrand)*-1.0;
-    }
-    while( v.x*v.x + v.y*v.y + v.z*v.z > 1.0 );
+    // random point on lower hemisphere:   
+    double th = sj_rand(hrand)*3.1415926535897*2.0;
+    v.z = -sj_rand(hrand);
+    double rt1mz2 = sqrt(1.0-v.z*v.z);
+    v.y = sin(th)*rt1mz2;
+    v.x = cos(th)*rt1mz2;
 
     raytrace(pa->c,o,v,MODE_PHOTON,0);
   }
